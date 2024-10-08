@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로또 번호 생성기</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        #lotto-numbers {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .lotto-ball {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+        button, input {
+            font-size: 18px;
+            padding: 10px 20px;
+            margin: 10px;
+        }
+        #latest-lotto {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>로또 번호 생성기</h1>
+    <div>
+        <input type="text" id="include-numbers" placeholder="포함할 숫자 (쉼표로 구분)">
+    </div>
+    <div>
+        <input type="text" id="exclude-numbers" placeholder="제외할 숫자 (쉼표로 구분)">
+    </div>
+    <div id="lotto-numbers"></div>
+    <button onclick="generateLottoNumbers()">번호 생성하기</button>
+
+    <div id="latest-lotto">
+        <h2>최근 당첨 번호</h2>
+        <p id="latest-draw"></p>
+        <div id="latest-numbers"></div>
+    </div>
+
+    <script>
+        function generateLottoNumbers() {
+            const includeInput = document.getElementById('include-numbers').value;
+            const excludeInput = document.getElementById('exclude-numbers').value;
+
+            const includeNumbers = includeInput.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num) && num >= 1 && num <= 45);
+            const excludeNumbers = excludeInput.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num) && num >= 1 && num <= 45);
+
+            if (new Set([...includeNumbers, ...excludeNumbers]).size !== includeNumbers.length + excludeNumbers.length) {
+                alert('포함할 숫자와 제외할 숫자가 중복되어서는 안 됩니다.');
+                return;
+            }
+
+            if (includeNumbers.length > 6) {
+                alert('포함할 숫자는 6개를 초과할 수 없습니다.');
+                return;
+            }
+
+            const availableNumbers = Array.from({length: 45}, (_, i) => i + 1)
+                .filter(num => !excludeNumbers.includes(num) && !includeNumbers.includes(num));
+
+            if (availableNumbers.length + includeNumbers.length < 6) {
+                alert('사용 가능한 숫자가 너무 적습니다. 제외할 숫자를 줄이거나 포함할 숫자를 조정해주세요.');
+                return;
+            }
+
+            const numbers = new Set(includeNumbers);
+            while (numbers.size < 6) {
+                const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+                numbers.add(availableNumbers[randomIndex]);
+            }
+
+            const sortedNumbers = Array.from(numbers).sort((a, b) => a - b);
+            document.getElementById('lotto-numbers').textContent = sortedNumbers.join(', ');
+            
+
+            const lottoNumbersDiv = document.getElementById('lotto-numbers');
+            lottoNumbersDiv.innerHTML = '';
+            sortedNumbers.forEach(number => {
+                const ball = document.createElement('div');
+                ball.className = 'lotto-ball';
+                ball.textContent = number;
+                ball.style.backgroundColor = getBallColor(number);
+                lottoNumbersDiv.appendChild(ball);
+            });
+        }
+
+        function getBallColor(number) {
+            if (number <= 10) return '#fbc400';
+            else if (number <= 20) return '#69c8f2';
+            else if (number <= 30) return '#ff7272';
+            else if (number <= 40) return '#aaa';
+            else return '#b0d840';
+        }
+
+        async function getLatestLottoNumbers() {
+            const proxyUrl = 'http://158.179.167.74:3000/lotto';
+
+            try {
+                const response = await fetch(proxyUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP 오류! 상태: ${response.status}`);
+                }
+                const html = await response.text();
+                
+                // HTML 파싱
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                const drawNumber = doc.querySelector('.win_result h4 strong').textContent;
+                const numbers = Array.from(doc.querySelectorAll('.win_result .nums .ball_645')).map(el => el.textContent);
+                
+                const latestDrawEl = document.getElementById('latest-draw');
+                latestDrawEl.textContent = `${drawNumber} 당첨번호`;
+                
+                const latestNumbersEl = document.getElementById('latest-numbers');
+                latestNumbersEl.innerHTML = '';
+                
+                numbers.forEach((number, index) => {
+                    const ball = document.createElement('div');
+                    ball.className = 'lotto-ball';
+                    ball.textContent = number;
+                    ball.style.backgroundColor = getBallColor(parseInt(number));
+                    if (index === 6) {
+                        const plusSign = document.createElement('div');
+                        plusSign.textContent = '+';
+                        plusSign.style.margin = '0 5px';
+                        latestNumbersEl.appendChild(plusSign);
+                    }
+                    latestNumbersEl.appendChild(ball);
+                });
+            } catch (error) {
+                console.error('최근 로또 번호를 가져오는 데 실패했습니다:', error);
+                document.getElementById('latest-draw').textContent = '최근 당첨 번호를 가져오는 데 실패했습니다.';
+            }
+        }
+
+        // 페이지 로드 시 최근 로또 번호 가져오기
+        window.addEventListener('load', getLatestLottoNumbers);
+    </script>
+</body>
+</html>
